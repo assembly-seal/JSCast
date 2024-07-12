@@ -1,5 +1,4 @@
 <img src="./building.png" id="building" style="display:none"/>
-<canvas id="gc2" width="500" height="500" style="background-color: black"></canvas>
 <script>
     fetch("gamedata.json")
         .then(response => response.json())
@@ -40,7 +39,7 @@
         const map = data.map;
 
         const buildings = [
-            {x: -5, y: -5, dist: 0},
+            {x: -5, y: -5,  dist: 0},
             {x: -5, y: -12, dist: 0},
         ];
 
@@ -79,7 +78,7 @@
 
             for (let building of buildings)
                 building.dist = dist(player.x, player.y, building.x, building.y);
-            
+
             buildings.sort((a, b) => b.dist - a.dist);
 
             for (let building of buildings) {
@@ -101,7 +100,6 @@
                 );
             }
 
-            let rays = [];
             let rayAngle = player.angle - FOV / 2;
             for (let i = 0; i < RAY_AMOUNT; i++) {
                 const x_step = Math.cos(rayAngle) * STEP_SIZE;
@@ -123,34 +121,7 @@
                 ctx.fillRect(BAR_SIZE * i, (DISPLAY_HEIGHT - height) / 2, BAR_SIZE + 1, height);
 
                 rayAngle += ANGLE_STEP;
-                rays.push([endX, endY]);
             }
-
-            /* START DEBUG MAP */
-            const BLOCK_SIZE = 500 / data.map_width;
-            const ctx2 = document.getElementById('gc2').getContext('2d');
-            ctx2.clearRect(0, 0, 500, 500);
-            ctx2.fillStyle = "white";
-            ctx2.strokeStyle = "black";
-            for (let i in map)
-                for (let j in map[i])
-                    if (map[j][i]) {
-                        ctx2.fillRect(i * BLOCK_SIZE, j * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-                        ctx2.strokeRect(i * BLOCK_SIZE, j * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-                    }
-
-            ctx2.strokeStyle = "red";
-            ctx2.beginPath();
-            ctx2.arc(player.x * BLOCK_SIZE, player.y * BLOCK_SIZE, 5, 0, 2 * Math.PI);
-            ctx2.stroke();
-
-            for (let i of rays) {
-                ctx2.beginPath();
-                ctx2.moveTo(player.x * BLOCK_SIZE, player.y * BLOCK_SIZE);
-                ctx2.lineTo(i[0] * BLOCK_SIZE, i[1] * BLOCK_SIZE);
-                ctx2.stroke();
-            }
-            /* END DEBUG MAP */
 
             window.requestAnimationFrame(gameLoop);
         } window.requestAnimationFrame(gameLoop);
