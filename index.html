@@ -1,0 +1,156 @@
+<img src="./building.png" id="building" style="display:none"/>
+<canvas id="gc2" width="500" height="500" style="background-color: black"></canvas>
+<script>
+    fetch("gamedata.json")
+        .then(response => response.json())
+        .then(data => engine(data))
+        .catch(error => console.error("Error loading JSON file", error));
+
+    function engine(data) {
+        const DISPLAY_HEIGHT = data.display_height;
+        const DISPLAY_WIDTH  = data.display_width;
+        const PLAYER_SPEED   = data.player_speed;
+        const RAY_AMOUNT     = data.ray_amount;
+        const RAY_LENGTH     = data.ray_length;
+        const STEP_SIZE      = data.step_size;    
+        const FOV            = data.fov;
+        const PI_2           = Math.PI * 2;
+
+        const BAR_SIZE     = DISPLAY_WIDTH / RAY_AMOUNT;
+        const ANGLE_STEP   = FOV           / RAY_AMOUNT;
+        const STEP_COUNT   = RAY_LENGTH    / STEP_SIZE;
+        const DIST_COLOR   = 255           / RAY_LENGTH; // inverse of desired color
+
+        const canvas = document.createElement('canvas');
+        canvas.style = "background:black";
+        canvas.height = DISPLAY_HEIGHT;
+        canvas.width  = DISPLAY_WIDTH;
+        document.body.appendChild(canvas);
+
+        const player = {
+            x:      data.playerX,
+            y:      data.playerY,
+            angle:  data.playerA,
+        }
+
+        const map = data.map;
+
+        const buildings = [
+            {x: -5, y: -5, dist: 0},
+            {x: -5, y: -12, dist: 0},
+        ];
+
+        const ctx        = canvas.getContext('2d');
+        const mod = (n, m) => {
+            let remain = n % m;
+            return remain >= 0 ? remain : remain + m;
+        };
+        const normal     = x                => mod(x, PI_2);
+        const dist       = (x1, y1, x2, y2) => Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        const clamp      = (x, min, max)    => Math.min(Math.max(x, min), max);
+        const getColor   = x                => Math.floor(255 - (x * DIST_COLOR));
+        const movePlayer = a                => {
+            player.x += Math.cos(player.angle + a) * PLAYER_SPEED;
+            player.y += Math.sin(player.angle + a) * PLAYER_SPEED;
+        }
+
+        const keys       = {};
+        const keyList    = ['w', 'a', 's', 'd', 'ArrowLeft', 'ArrowRight'];
+        const keyActions = {
+            w:          () => movePlayer(0),
+            a:          () => movePlayer(Math.PI * 3 / 2),
+            s:          () => movePlayer(Math.PI),
+            d:          () => movePlayer(Math.PI / 2),
+            ArrowLeft:  () => player.angle -= Math.PI / 100,
+            ArrowRight: () => player.angle += Math.PI / 100,
+        }
+
+        document.addEventListener('keydown', e => keyList.includes(e.key) ? keys[e.key] = true  : 0);
+        document.addEventListener('keyup',   e => keyList.includes(e.key) ? keys[e.key] = false : 0);
+
+        function gameLoop() {
+            for (let i in keys)
+                if (keys[i] === true)
+                    keyActions[i]();
+        player.angle = mod(player.angle, PI_2);
+
+        ctx.clearRect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+
+        /* START BUILDINGS CODE */
+        //dist(player.x, player.y, building.x, building.y);
+        for (let building of buildings)
+            building.dist = dist(player.x, player.y, building.x, building.y);
+
+        buildings.sort((a, b) => b.dist - a.dist);
+
+        for (let building of buildings) {
+            let angleToBuilding = Math.atan2(building.y - player.y, building.x - player.x);
+            if (mod(angleToBuilding - (player.angle - FOV / 2), PI_2) < FOV) {
+                let buildingImg = document.getElementById('building');
+                let thing       = RAY_AMOUNT / FOV;
+                let height      = 227 * 20 / building.dist;
+                let base        = DISPLAY_HEIGHT / (building.dist * Math.cos(angleToBuilding - player.angle));
+                base            = base + (DISPLAY_HEIGHT - base) / 2;
+                ctx.drawImage(buildingImg, mod(angleToBuilding - player.angle + FOV / 2, PI_2) * thing * BAR_SIZE - (75 * 20 / building.dist),
+                base - height,
+                150 * 20 / building.dist,
+                227 * 20 / building.dist);
+            }
+        }
+        /* END BUILDINGS CODE */
+
+        let rays = [];
+        let rayAngle = player.angle - FOV / 2;
+        for (let i = 0; i < RAY_AMOUNT; i++) {
+            const x_step = Math.cos(rayAngle) * STEP_SIZE;
+            const y_step = Math.sin(rayAngle) * STEP_SIZE;
+            let endX     = player.x;
+            let endY     = player.y;
+
+            for (let j = 0; j < STEP_COUNT; j++) {
+                if (map[Math.floor(endY)][Math.floor(endX)]) break;
+                endX += x_step;
+                endY += y_step;
+            }
+
+            const distance = dist(player.x, player.y, endX, endY);
+            const height   = DISPLAY_HEIGHT / (distance * Math.cos(rayAngle - player.angle));
+            const color    = getColor(distance);
+
+            ctx.fillStyle = `rgb(${color}, 0, ${color})`;
+            ctx.fillRect(BAR_SIZE * i, (DISPLAY_HEIGHT - height) / 2, BAR_SIZE + 1, height);
+
+            rayAngle += ANGLE_STEP;
+            rays.push([endX, endY]);
+        }
+
+            /* MEOW MEOW MEOW MEOW MEOW MEOW MEOW */
+        const BLOCK_SIZE = 500 / data.map_width;
+        const ctx2 = document.getElementById('gc2').getContext('2d');
+        ctx2.clearRect(0, 0, 500, 500);
+        ctx2.fillStyle = "white";
+        ctx2.strokeStyle = "black";
+        for (let i in map)
+            for (let j in map[i])
+                if (map[j][i]) {
+                    ctx2.fillRect(i * BLOCK_SIZE, j * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    ctx2.strokeRect(i * BLOCK_SIZE, j * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                }
+
+        ctx2.strokeStyle = "red";
+        ctx2.beginPath();
+        ctx2.arc(player.x * BLOCK_SIZE, player.y * BLOCK_SIZE, 5, 0, 2 * Math.PI);
+        ctx2.stroke();
+
+        for (let i of rays) {
+            ctx2.beginPath();
+            ctx2.moveTo(player.x * BLOCK_SIZE, player.y * BLOCK_SIZE);
+            ctx2.lineTo(i[0] * BLOCK_SIZE, i[1] * BLOCK_SIZE);
+            ctx2.stroke();
+        }
+        /* MEOW MEOW MEOW MEOW MEOW MEOW MEOW */
+
+            window.requestAnimationFrame(gameLoop);
+        } window.requestAnimationFrame(gameLoop);
+    }
+</script>
