@@ -30,21 +30,11 @@
 
         const buildingImg = document.getElementById('building');
 
-        const player = {
-            x:      data.playerX,
-            y:      data.playerY,
-            angle:  data.playerA,
-        }
-
-        const map = data.map;
-
-        const buildings = [
-            {x: -5, y: -5,  dist: 0},
-            {x: -5, y: -12, dist: 0},
-        ];
+        const player    = data.player;
+        const map       = data.map;
+        const buildings = data.buildings;
 
         const ctx        = canvas.getContext('2d');
-        const normal     = x                => mod(x, PI_2);
         const dist       = (x1, y1, x2, y2) => Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
         const clamp      = (x, min, max)    => Math.min(Math.max(x, min), max);
         const mod        = (a, n) => a - Math.abs(n) * Math.floor(a / Math.abs(n));
