@@ -16,16 +16,20 @@
         const FOV            = data.fov;
         const PI_2           = Math.PI * 2;
 
+        const HALF_FOV     = FOV           / 2;
         const BAR_SIZE     = DISPLAY_WIDTH / RAY_AMOUNT;
         const ANGLE_STEP   = FOV           / RAY_AMOUNT;
+        const ANGLE_TO_BAR = ANGLE_STEP    / BAR_SIZE;
         const STEP_COUNT   = RAY_LENGTH    / STEP_SIZE;
         const DIST_COLOR   = 255           / RAY_LENGTH; // inverse of desired color
 
-        const canvas = document.createElement('canvas');
-        canvas.style = "background:black";
+        const canvas  = document.createElement('canvas');
+        canvas.style  = "background:black";
         canvas.height = DISPLAY_HEIGHT;
         canvas.width  = DISPLAY_WIDTH;
         document.body.appendChild(canvas);
+
+        const buildingImg = document.getElementById('building');
 
         const player = {
             x:      data.playerX,
@@ -41,13 +45,10 @@
         ];
 
         const ctx        = canvas.getContext('2d');
-        const mod = (n, m) => {
-            let remain = n % m;
-            return remain >= 0 ? remain : remain + m;
-        };
         const normal     = x                => mod(x, PI_2);
         const dist       = (x1, y1, x2, y2) => Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
         const clamp      = (x, min, max)    => Math.min(Math.max(x, min), max);
+        const mod        = (a, n) => a - Math.abs(n) * Math.floor(a / Math.abs(n));
         const getColor   = x                => Math.floor(255 - (x * DIST_COLOR));
         const movePlayer = a                => {
             player.x += Math.cos(player.angle + a) * PLAYER_SPEED;
@@ -72,83 +73,84 @@
             for (let i in keys)
                 if (keys[i] === true)
                     keyActions[i]();
-        player.angle = mod(player.angle, PI_2);
+            player.angle = mod(player.angle, PI_2);
 
-        ctx.clearRect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+            ctx.clearRect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
-        /* START BUILDINGS CODE */
-        //dist(player.x, player.y, building.x, building.y);
-        for (let building of buildings)
-            building.dist = dist(player.x, player.y, building.x, building.y);
+            for (let building of buildings)
+                building.dist = dist(player.x, player.y, building.x, building.y);
+            
+            buildings.sort((a, b) => b.dist - a.dist);
 
-        buildings.sort((a, b) => b.dist - a.dist);
+            for (let building of buildings) {
+                const buildingAngle         = Math.atan2(building.y - player.y, building.x - player.x);
+                const angleOffset           = buildingAngle - player.angle;
+                const relativeAngle         = mod(angleOffset + HALF_FOV, PI_2);
+                if (relativeAngle > FOV) continue;
 
-        for (let building of buildings) {
-            let angleToBuilding = Math.atan2(building.y - player.y, building.x - player.x);
-            if (mod(angleToBuilding - (player.angle - FOV / 2), PI_2) < FOV) {
-                let buildingImg = document.getElementById('building');
-                let thing       = RAY_AMOUNT / FOV;
-                let height      = 227 * 20 / building.dist;
-                let base        = DISPLAY_HEIGHT / (building.dist * Math.cos(angleToBuilding - player.angle));
-                base            = base + (DISPLAY_HEIGHT - base) / 2;
-                ctx.drawImage(buildingImg, mod(angleToBuilding - player.angle + FOV / 2, PI_2) * thing * BAR_SIZE - (75 * 20 / building.dist),
-                base - height,
-                150 * 20 / building.dist,
-                227 * 20 / building.dist);
-            }
-        }
-        /* END BUILDINGS CODE */
-
-        let rays = [];
-        let rayAngle = player.angle - FOV / 2;
-        for (let i = 0; i < RAY_AMOUNT; i++) {
-            const x_step = Math.cos(rayAngle) * STEP_SIZE;
-            const y_step = Math.sin(rayAngle) * STEP_SIZE;
-            let endX     = player.x;
-            let endY     = player.y;
-
-            for (let j = 0; j < STEP_COUNT; j++) {
-                if (map[Math.floor(endY)][Math.floor(endX)]) break;
-                endX += x_step;
-                endY += y_step;
+                const sizeMultiplier = 20 / building.dist;
+                const height         = 227 * sizeMultiplier;
+                const wallHeight     = DISPLAY_HEIGHT / (building.dist * Math.cos(angleOffset));
+                const base           = wallHeight + (DISPLAY_HEIGHT - wallHeight) / 2;
+                ctx.drawImage(
+                    buildingImg,
+                    relativeAngle / ANGLE_TO_BAR - 75 * sizeMultiplier,
+                    base - height,
+                    150 * sizeMultiplier,
+                    227 * sizeMultiplier
+                );
             }
 
-            const distance = dist(player.x, player.y, endX, endY);
-            const height   = DISPLAY_HEIGHT / (distance * Math.cos(rayAngle - player.angle));
-            const color    = getColor(distance);
+            let rays = [];
+            let rayAngle = player.angle - FOV / 2;
+            for (let i = 0; i < RAY_AMOUNT; i++) {
+                const x_step = Math.cos(rayAngle) * STEP_SIZE;
+                const y_step = Math.sin(rayAngle) * STEP_SIZE;
+                let endX     = player.x;
+                let endY     = player.y;
 
-            ctx.fillStyle = `rgb(${color}, 0, ${color})`;
-            ctx.fillRect(BAR_SIZE * i, (DISPLAY_HEIGHT - height) / 2, BAR_SIZE + 1, height);
-
-            rayAngle += ANGLE_STEP;
-            rays.push([endX, endY]);
-        }
-
-            /* MEOW MEOW MEOW MEOW MEOW MEOW MEOW */
-        const BLOCK_SIZE = 500 / data.map_width;
-        const ctx2 = document.getElementById('gc2').getContext('2d');
-        ctx2.clearRect(0, 0, 500, 500);
-        ctx2.fillStyle = "white";
-        ctx2.strokeStyle = "black";
-        for (let i in map)
-            for (let j in map[i])
-                if (map[j][i]) {
-                    ctx2.fillRect(i * BLOCK_SIZE, j * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-                    ctx2.strokeRect(i * BLOCK_SIZE, j * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                for (let j = 0; j < STEP_COUNT; j++) {
+                    if (map[Math.floor(endY)][Math.floor(endX)]) break;
+                    endX += x_step;
+                    endY += y_step;
                 }
 
-        ctx2.strokeStyle = "red";
-        ctx2.beginPath();
-        ctx2.arc(player.x * BLOCK_SIZE, player.y * BLOCK_SIZE, 5, 0, 2 * Math.PI);
-        ctx2.stroke();
+                const distance = dist(player.x, player.y, endX, endY);
+                const height   = DISPLAY_HEIGHT / (distance * Math.cos(rayAngle - player.angle));
+                const color    = getColor(distance);
 
-        for (let i of rays) {
+                ctx.fillStyle = `rgb(${color}, 0, ${color})`;
+                ctx.fillRect(BAR_SIZE * i, (DISPLAY_HEIGHT - height) / 2, BAR_SIZE + 1, height);
+
+                rayAngle += ANGLE_STEP;
+                rays.push([endX, endY]);
+            }
+
+            /* START DEBUG MAP */
+            const BLOCK_SIZE = 500 / data.map_width;
+            const ctx2 = document.getElementById('gc2').getContext('2d');
+            ctx2.clearRect(0, 0, 500, 500);
+            ctx2.fillStyle = "white";
+            ctx2.strokeStyle = "black";
+            for (let i in map)
+                for (let j in map[i])
+                    if (map[j][i]) {
+                        ctx2.fillRect(i * BLOCK_SIZE, j * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                        ctx2.strokeRect(i * BLOCK_SIZE, j * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+                    }
+
+            ctx2.strokeStyle = "red";
             ctx2.beginPath();
-            ctx2.moveTo(player.x * BLOCK_SIZE, player.y * BLOCK_SIZE);
-            ctx2.lineTo(i[0] * BLOCK_SIZE, i[1] * BLOCK_SIZE);
+            ctx2.arc(player.x * BLOCK_SIZE, player.y * BLOCK_SIZE, 5, 0, 2 * Math.PI);
             ctx2.stroke();
-        }
-        /* MEOW MEOW MEOW MEOW MEOW MEOW MEOW */
+
+            for (let i of rays) {
+                ctx2.beginPath();
+                ctx2.moveTo(player.x * BLOCK_SIZE, player.y * BLOCK_SIZE);
+                ctx2.lineTo(i[0] * BLOCK_SIZE, i[1] * BLOCK_SIZE);
+                ctx2.stroke();
+            }
+            /* END DEBUG MAP */
 
             window.requestAnimationFrame(gameLoop);
         } window.requestAnimationFrame(gameLoop);
